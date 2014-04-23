@@ -1,8 +1,9 @@
 players = new Meteor.Collection('players')
 games = new Meteor.Collection('games')
 
-var currentGame = function () {
-  return games.findOne({
+var currentGame = function (collection) {
+  collection = collection || games;
+  return collection.findOne({
     //active: true
     total: {
       $lt: 50
@@ -116,7 +117,8 @@ if (Meteor.isServer) {
       var user = players.findOne({
         userName: userName
       })
-      if (!user) {players.insert({
+      if (!user) {
+        user = players.insert({
           userName: userName
         });
       }
@@ -133,8 +135,45 @@ if (Meteor.isServer) {
         $in: [current_user]
       }
     })
-  })
+  });
+  Meteor.setInterval(function () {
+    var psmith = players.findOne({
+      userName: 'Psmith'
+    })._id;
+    var psmithsGames = games.find({
+      players: {
+        $in: [psmith]
+      },
+      total: {
+        $lt: 50
+      }
+    }).fetch();
+    psmithsGames.forEach(function (game) {
+      var lastMove = game.moves && game.moves[game.moves.length - 1];
+      if (lastMove && lastMove.user_id == psmith) {
+        // Don't move, it's not our turn yet.
+      } else if (lastMove) {
+        // We don't move on the first move, we want to give the player the chance to go first.
+        var total = game.total;
+        var computerpick = (50 - total) % 11;
+        if (computerpick == 0) computerpick = Math.round(Math.random() * 9 + 1);
+        Meteor.call('submitMove', psmith, game._id, computerpick, function (error, result) {
+          console.log(error)
+        });
+      }
+    });
+  }, 500);
   Meteor.startup(function () {
     // code to run on server at startup
+    if (!players.find().count()) {
+      // Run on first run
+      // Add computer players
+      players.insert({
+        userName: 'Psmith'
+      });
+      players.insert({
+        userName: 'Freddy'
+      });
+    }
   });
 }
