@@ -26,10 +26,26 @@
   <form><input type="text" placeholder="What's your name?"></form>
 </template>
 <template name="lobby">
-  Lobby
+  <ul>
+  {{#each availablePlayers}}
+    <li>{{> player}}</li>
+  {{/each}}
+  </ul>
+</template>
+<template name="player">
+  <span class="">{{userName}}</span> <button class="btn ">Play</button>
 </template>
 <template name="game">
-  Game
+  <div>
+    {{#with game}}
+    <h1 style="text-align: center;">{{total}}</h1>
+    {{/with}}
+  </div>
+  <div class="span4 offset4">
+    <form>
+      <input type="number">
+    </form>
+  </div>
 </template>
 <template name="lost">
 You're lost!
