@@ -4,26 +4,33 @@
 
 <body>
 	<div class="container">
-	<div class="hero-unit">
-		<h1>Welcome to Ian's Puzzle</h1>
-		<p>Enter the final number to add up to 50!</p>
-	</div>
-		
-  {{> hello}}
+  	<div class="hero-unit">
+  		<h1>Welcome to Ian's Puzzle</h1>
+  		<p>Enter the final number to add up to 50!</p>
+  	</div>
+    {{> main}}
 	</div>
 </body>
-
-<template name="hello">
-  
-  <h1>{{total}}<span class="pull-right">{{goal}}</span></h1>
-  <h1 class="winner"></h1>
-  <h3 class="computerpick" style="display: none;">The computer picked: {{computer}}</h3>
-  <div class="container">
-  	<div class="span4 offset4">
-  	<form class="">
-  		<label>Enter a number between 1 and 10</label>
-	  <input type="number" value="Click" class="input-block-level"/>
-  </form>
-  </div>
-  </div>
+<template name="main">
+  {{#if showWelcome}}
+    {{> welcome}}
+  {{/if}}
+  {{#if showLobby}}
+    {{> lobby}}
+  {{/if}}
+  {{#if showGame}}
+    {{> game}}
+  {{/if}}
+</template>
+<template name="welcome">
+  <form><input type="text" placeholder="What's your name?"></form>
+</template>
+<template name="lobby">
+  Lobby
+</template>
+<template name="game">
+  Game
+</template>
+<template name="lost">
+You're lost!
 </template>

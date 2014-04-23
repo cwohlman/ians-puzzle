@@ -6,3 +6,7 @@ body {
 .winner, .computer {
 	text-align: center;
 }
+
+.winner {
+	color: rgb(214, 37, 37)
+}
