@@ -4,10 +4,7 @@ games = new Meteor.Collection('games')
 var currentGame = function (collection) {
   collection = collection || games;
   return collection.findOne({
-    //active: true
-    total: {
-      $lt: 50
-    }
+    active: true
   });
 }
 
@@ -31,21 +28,24 @@ var handleMessage = function (error, success) {
 
 
 if (Meteor.isClient) {
-Deps.autorun(function () {
-  var game = currentGame();
-  var me = Session.get('user_id');
-  if (game && !notMyTurn(game, me) && game.moves) {
-    var lastMove = game.moves[game.moves.length - 1];
-    var playerName = players.findOne({_id: lastMove.user_id}).userName;
-    var move = lastMove.move;
-    handleMessage(null, playerName + " played " + move);
-  } else if (game && game.total >= 50) {
-    var lastMove = game.moves[game.moves.length - 1];
-    var playerName = players.findOne({_id: lastMove.user_id}).userName;
-    if (notMyTurn(game, me)) handleMessage(null, "You win!");
-    else handleMessage(playerName + " wins :(");
-  }
-})
+  Deps.autorun(function () {
+    var game = currentGame();
+    var me = Session.get('user_id');
+     if (game && game.total >= 50) {
+      var lastMove = game.moves[game.moves.length - 1];
+      if (notMyTurn(game, me)) {
+        handleMessage(null, "You win!");
+      } else {
+        var playerName = players.findOne({_id: lastMove.user_id}).userName;
+        handleMessage(playerName + " wins :(");
+      }
+    } else if (game && !notMyTurn(game, me) && game.moves) {
+      var lastMove = game.moves[game.moves.length - 1];
+      var playerName = players.findOne({_id: lastMove.user_id}).userName;
+      var move = lastMove.move;
+      handleMessage(null, playerName + " played " + move);
+    }
+  })
   Meteor.subscribe('players');
   if (Session.get('user_id')) Meteor.subscribe('games', Session.get('user_id'));
   Template.main.helpers({
@@ -99,17 +99,26 @@ Deps.autorun(function () {
     this.find('input').focus();
   };
   Template.game.helpers({
-    game: currentGame
+    game: currentGame,
+    done: function () {
+      var game =  currentGame();
+      return game && game.total >= 50
+    }
   });
   Template.game.events({
     'submit form': function (e, tmpl) {
       e.preventDefault();
-      var val = Number(tmpl.find('input').value);
-      tmpl.find('input').value = "";
-      var game_id = currentGame()._id;
-      Meteor.call('submitMove', Session.get('user_id'), game_id, val, function (error, result) {
-        handleMessage(error);
-      });
+      var game = currentGame();
+      if (game.total >= 50) {
+        // Game is over, user want's  to go back to lobby
+        Meteor.call('gameOver', Session.get('user_id'), game._id, function (error, result) {});
+      } else {
+        var val = Number(tmpl.find('input').value);
+        tmpl.find('input').value = "";
+        Meteor.call('submitMove', Session.get('user_id'), game._id, val, function (error, result) {
+          handleMessage(error);
+        });
+      }
     }
   });
 }
@@ -142,6 +151,9 @@ if (Meteor.isServer) {
       };
       var total = game.total;
       total += move;
+      if (total > 50) {
+        throw new Meteor.Error(500, 'Invalid move. Please pick a move which results in 50 or less.', {});
+      }
       game.moves = game.moves || []
       game.moves.push(newMove);
       games.update({
@@ -154,14 +166,27 @@ if (Meteor.isServer) {
       });
       return game;
     },
-    startGame: function (current_user, user_id) {;
+    startGame: function (current_user, user_id) {
       return games.insert({
         players: [
           current_user,
           user_id
         ],
-        total: 0
+        total: 0,
+        active: true
       })
+    },
+    gameOver: function (current_user, game_id) {
+      var game = games.findOne({_id: game_id});
+      if (!game) {
+        throw new Meteor.Error(500, 'Game not found!');
+      }
+      if (game.players.indexOf(current_user) == -1) {
+        throw new Meteor.Error(500, 'Not your game');
+      }
+      games.update({_id: game_id}, {active: {
+        $set: false
+      }});
     },
     signUp: function (userName) {
       var user = players.findOne({
