@@ -136,6 +136,7 @@ if (Meteor.isServer) {
       }
     })
   });
+  // Psmith AI
   Meteor.setInterval(function () {
     var psmith = players.findOne({
       userName: 'Psmith'
@@ -157,6 +158,35 @@ if (Meteor.isServer) {
         var total = game.total;
         var computerpick = (50 - total) % 11;
         if (computerpick == 0) computerpick = Math.round(Math.random() * 9 + 1);
+        Meteor.call('submitMove', psmith, game._id, computerpick, function (error, result) {
+          console.log(error)
+        });
+      }
+    });
+  }, 500);
+  // Freddy AI
+  Meteor.setInterval(function () {
+    var psmith = players.findOne({
+      userName: 'Freddy'
+    })._id;
+    var psmithsGames = games.find({
+      players: {
+        $in: [psmith]
+      },
+      total: {
+        $lt: 50
+      }
+    }).fetch();
+    psmithsGames.forEach(function (game) {
+      var lastMove = game.moves && game.moves[game.moves.length - 1];
+      if (lastMove && lastMove.user_id == psmith) {
+        // Don't move, it's not our turn yet.
+      } else {
+        // Freddy tries to go first, but won't always win
+        var total = game.total;
+        var computerpick = (50 - total) % 11;
+        if (computerpick == 0) computerpick = Math.round(Math.random() * 9 + 1);
+        if (total < 40) computerpick += Math.round(Math.random() * 2 - 1)
         Meteor.call('submitMove', psmith, game._id, computerpick, function (error, result) {
           console.log(error)
         });
