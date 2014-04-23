@@ -65,6 +65,9 @@ Deps.autorun(function () {
       return Session.get('message-class');
     }
   });
+  Template.welcome.rendered = function () {
+    this.find('input').focus();
+  };
   Template.welcome.events({
     'submit form': function (e, tmpl) {
       e.preventDefault();
@@ -92,6 +95,9 @@ Deps.autorun(function () {
       });
     }
   });
+  Template.game.rendered = function () {
+    this.find('input').focus();
+  };
   Template.game.helpers({
     game: currentGame
   });
