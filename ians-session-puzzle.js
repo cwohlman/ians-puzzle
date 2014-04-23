@@ -3,7 +3,7 @@ games = new Meteor.Collection('games')
 
 if (Meteor.isClient) {
   Meteor.subscribe('players');
-  Meteor.subscribe('games');
+  if (Session.get('user_id')) Meteor.subscribe('games', Session.get('user_id'));
   Template.main.helpers({
     showWelcome: function () {
       return !Session.get('user_id');
@@ -21,6 +21,7 @@ if (Meteor.isClient) {
       var userName = tmpl.find('input').value;
       Meteor.call('signUp', userName, function (error, result) {
         Session.set('user_id', result);
+        Meteor.subscribe('games', result);
       });
     }
   });
@@ -34,8 +35,8 @@ if (Meteor.isClient) {
     }
   });
   Template.lobby.events({
-    'button click': function (e, tmpl) {
-      Meteor.call('startGame', this._id, function (error, result) {});
+    'click button': function (e, tmpl) {
+      Meteor.call('startGame', Session.get('user_id'), this._id, function (error, result) {});
     }
   });
   Template.game.helpers({
@@ -47,8 +48,9 @@ if (Meteor.isClient) {
     'submit form': function (e, tmpl) {
       e.preventDefault();
       var val = Number(tmpl.find('input').value);
+      tmpl.find('input').value = "";
       var game_id = games.findOne()._id;
-      Meteor.call('submitMove', game_id, val, function (error, result) {
+      Meteor.call('submitMove', Session.get('user_id'), game_id, val, function (error, result) {
         // TODO: validation feedback.
       });
     }
@@ -63,8 +65,7 @@ if (Meteor.isServer) {
     //  moves: [],
     //  total: 0
     // }
-    submitMove: function (game_id, move) {
-      var current_user = Meteor.userId()
+    submitMove: function (current_user, game_id, move) {
       var game = games.findOne({
         _id: game_id
       });
@@ -93,8 +94,7 @@ if (Meteor.isServer) {
         }
       });
     },
-    startGame: function (user_id) {
-      var current_user = Meteor.userId();
+    startGame: function (current_user, user_id) {;
       return games.insert({
         players: [
           current_user,
@@ -112,20 +112,16 @@ if (Meteor.isServer) {
         });
       }
       user = user._id || user;
-      this.setUserId(user);
       return user;
-    },
-    getUser: function () {
-      return Meteor.userId()
     }
   });
   Meteor.publish('players', function () {
     return players.find();
   });
-  Meteor.publish('games', function () {
+  Meteor.publish('games', function (current_user) {
     return games.find({
       players: {
-        $in: [this.userId]
+        $in: [current_user]
       },
       total: {
         $lt: 50
