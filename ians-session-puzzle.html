@@ -9,6 +9,7 @@
   		<p>Enter the final number to add up to 50!</p>
   	</div>
     {{> main}}
+      
 	</div>
 </body>
 <template name="main">
@@ -41,10 +42,12 @@
     <h1 style="text-align: center;">{{total}}</h1>
     {{/with}}
   </div>
-  <div class="span4 offset4">
-    <form>
-      <input type="number">
-    </form>
+  <div class="row">
+    <div class="span4 offset4">
+      <form>
+        <input type="number" class="input-block-level">
+      </form>
+    </div>
   </div>
 </template>
 <template name="lost">

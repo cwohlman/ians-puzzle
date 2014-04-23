@@ -1,6 +1,15 @@
 players = new Meteor.Collection('players')
 games = new Meteor.Collection('games')
 
+var currentGame = function () {
+  return games.findOne({
+    //active: true
+    total: {
+      $lt: 50
+    }
+  });
+}
+
 if (Meteor.isClient) {
   Meteor.subscribe('players');
   if (Session.get('user_id')) Meteor.subscribe('games', Session.get('user_id'));
@@ -9,11 +18,9 @@ if (Meteor.isClient) {
       return !Session.get('user_id');
     },
     showLobby: function () {
-      return Session.get('user_id') && !games.findOne();
+      return Session.get('user_id') && !currentGame();
     },
-    showGame: function () {
-      return games.findOne();
-    }
+    showGame: currentGame
   });
   Template.welcome.events({
     'submit form': function (e, tmpl) {
@@ -40,16 +47,14 @@ if (Meteor.isClient) {
     }
   });
   Template.game.helpers({
-    game: function () {
-      return games.findOne();
-    }
+    game: currentGame
   });
   Template.game.events({
     'submit form': function (e, tmpl) {
       e.preventDefault();
       var val = Number(tmpl.find('input').value);
       tmpl.find('input').value = "";
-      var game_id = games.findOne()._id;
+      var game_id = currentGame()._id;
       Meteor.call('submitMove', Session.get('user_id'), game_id, val, function (error, result) {
         // TODO: validation feedback.
       });
@@ -77,6 +82,9 @@ if (Meteor.isServer) {
       if (lastMove && lastMove.user_id == current_user) {
         throw new Error("Not your turn.")
       }
+      if (move > 10 || move < 1) {
+        throw new Error("Invalid move. Please pick a number from 1 to 10")
+      }
       var newMove = {
         user_id: current_user,
         move: move
@@ -93,6 +101,7 @@ if (Meteor.isServer) {
           total: total
         }
       });
+      return game;
     },
     startGame: function (current_user, user_id) {;
       return games.insert({
@@ -122,9 +131,6 @@ if (Meteor.isServer) {
     return games.find({
       players: {
         $in: [current_user]
-      },
-      total: {
-        $lt: 50
       }
     })
   })
