@@ -11,7 +11,41 @@ var currentGame = function (collection) {
   });
 }
 
+var notMyTurn = function (game, player_id) {
+  var lastMove = game.moves && game.moves[game.moves.length - 1];
+  return lastMove && lastMove.user_id == player_id;
+}
+
+var handleMessage = function (error, success) {
+  var message = error || success;
+  var alertClass = error ? "alert-error" : "alert-success";
+  var text = message && (message.reason || message.message || message);
+
+  Session.set('latest-message', text);
+  Session.set('message-class', alertClass);
+
+  if (message) {
+    $('.notify').fadeIn().delay(2000).fadeOut();
+  }
+}
+
+
 if (Meteor.isClient) {
+Deps.autorun(function () {
+  var game = currentGame();
+  var me = Session.get('user_id');
+  if (game && !notMyTurn(game, me) && game.moves) {
+    var lastMove = game.moves[game.moves.length - 1];
+    var playerName = players.findOne({_id: lastMove.user_id}).userName;
+    var move = lastMove.move;
+    handleMessage(null, playerName + " played " + move);
+  } else if (game && game.total >= 50) {
+    var lastMove = game.moves[game.moves.length - 1];
+    var playerName = players.findOne({_id: lastMove.user_id}).userName;
+    if (notMyTurn(game, me)) handleMessage(null, "You win!");
+    else handleMessage(playerName + " wins :(");
+  }
+})
   Meteor.subscribe('players');
   if (Session.get('user_id')) Meteor.subscribe('games', Session.get('user_id'));
   Template.main.helpers({
@@ -23,11 +57,20 @@ if (Meteor.isClient) {
     },
     showGame: currentGame
   });
+  Template.messages.helpers({
+    messageText: function () {
+      return Session.get('latest-message');
+    },
+    alertClass: function () {
+      return Session.get('message-class');
+    }
+  });
   Template.welcome.events({
     'submit form': function (e, tmpl) {
       e.preventDefault();
       var userName = tmpl.find('input').value;
       Meteor.call('signUp', userName, function (error, result) {
+        handleMessage(error);
         Session.set('user_id', result);
         Meteor.subscribe('games', result);
       });
@@ -44,7 +87,9 @@ if (Meteor.isClient) {
   });
   Template.lobby.events({
     'click button': function (e, tmpl) {
-      Meteor.call('startGame', Session.get('user_id'), this._id, function (error, result) {});
+      Meteor.call('startGame', Session.get('user_id'), this._id, function (error, result) {
+        handleMessage(error);
+      });
     }
   });
   Template.game.helpers({
@@ -57,7 +102,7 @@ if (Meteor.isClient) {
       tmpl.find('input').value = "";
       var game_id = currentGame()._id;
       Meteor.call('submitMove', Session.get('user_id'), game_id, val, function (error, result) {
-        // TODO: validation feedback.
+        handleMessage(error);
       });
     }
   });
@@ -77,14 +122,13 @@ if (Meteor.isServer) {
       });
       var user_index = game.players.indexOf(current_user);
       if (user_index == -1) {
-        throw new Error("User is not part of this game!")
+        throw new Meteor.Error(500, "User is not part of this game!", {});
       }
-      var lastMove = game.moves && game.moves[game.moves.length - 1];
-      if (lastMove && lastMove.user_id == current_user) {
-        throw new Error("Not your turn.")
+      if (notMyTurn(game, current_user)) {
+        throw new Meteor.Error(500, "Not your turn.", {})
       }
       if (move > 10 || move < 1) {
-        throw new Error("Invalid move. Please pick a number from 1 to 10")
+        throw new Meteor.Error(500, "Invalid move. Please pick a number from 1 to 10", {})
       }
       var newMove = {
         user_id: current_user,
@@ -150,10 +194,9 @@ if (Meteor.isServer) {
       }
     }).fetch();
     psmithsGames.forEach(function (game) {
-      var lastMove = game.moves && game.moves[game.moves.length - 1];
-      if (lastMove && lastMove.user_id == psmith) {
+      if (notMyTurn(game, psmith)) {
         // Don't move, it's not our turn yet.
-      } else if (lastMove) {
+      } else if (game.moves) {
         // We don't move on the first move, we want to give the player the chance to go first.
         var total = game.total;
         var computerpick = (50 - total) % 11;
@@ -178,8 +221,7 @@ if (Meteor.isServer) {
       }
     }).fetch();
     psmithsGames.forEach(function (game) {
-      var lastMove = game.moves && game.moves[game.moves.length - 1];
-      if (lastMove && lastMove.user_id == psmith) {
+      if (notMyTurn(game, psmith)) {
         // Don't move, it's not our turn yet.
       } else {
         // Freddy tries to go first, but won't always win
