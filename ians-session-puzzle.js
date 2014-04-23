@@ -12,8 +12,10 @@ currentGame = function (collection) {
 
 var currentRule = function (collection) {
   collection = collection || rules;
-  return collection.findOne({
-    _id: Session.get('game_id')
+  var game = currentGame();
+
+  return game && collection.findOne({
+    _id: game.rule_id
   }) || collection.findOne({name: "Ian's Puzzle"});;
 }
 
@@ -155,14 +157,16 @@ if (Meteor.isClient) {
     game: currentGame,
     done: function () {
       var game =  currentGame();
-      return game && game.total >= 50
+      var rule = currentRule();
+      return game && game.total >= rule.goal
     }
   });
   Template.game.events({
     'submit form': function (e, tmpl) {
       e.preventDefault();
       var game = currentGame();
-      if (game.total >= 50) {
+      var rule = currentRule();
+      if (game.total >= rule.goal) {
         // Game is over, user want's  to go back to lobby
         Meteor.call('gameOver', Session.get('user_id'), game._id, function (error, result) {});
       } else {
