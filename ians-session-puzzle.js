@@ -1,11 +1,20 @@
 players = new Meteor.Collection('players')
 games = new Meteor.Collection('games')
+rules = new Meteor.Collection('rules');
 
-var currentGame = function (collection) {
+
+currentGame = function (collection) {
   collection = collection || games;
   return collection.findOne({
     active: true
   });
+}
+
+var currentRule = function (collection) {
+  collection = collection || rules;
+  return collection.findOne({
+    _id: Session.get('game_id')
+  }) || collection.findOne({name: "Ian's Puzzle"});;
 }
 
 var notMyTurn = function (game, player_id) {
@@ -26,12 +35,42 @@ var handleMessage = function (error, success) {
   }
 }
 
+var allowedMovesToString = function (moves) {
+  // moves is an array
+  var result = [];
+  var first;
+  var last;
+  moves.forEach(function (a) {
+    // TODO: sort the array, watchout: default sort is alpha numeric
+    a = Number(a)
+    if ((last + 1) == a) last = a;
+    else {
+      if (first || first === 0) {
+        if (first == last) result.push(last + "");
+        else {
+          result.push(first + '..' + last);
+        }        
+      }
+
+      first = a;
+      last = a;
+    }
+  });
+  if (first || first === 0) {
+    if (first == last) result.push(last + "");
+    else {
+      result.push(first + '..' + last);
+    }        
+  }
+  return result.join(",");
+}
 
 if (Meteor.isClient) {
   Deps.autorun(function () {
     var game = currentGame();
+    var rule = currentRule();
     var me = Session.get('user_id');
-     if (game && game.total >= 50) {
+     if (game && game.total >= rule.goal) {
       var lastMove = game.moves[game.moves.length - 1];
       if (notMyTurn(game, me)) {
         handleMessage(null, "You win!");
@@ -47,13 +86,17 @@ if (Meteor.isClient) {
     }
   })
   Meteor.subscribe('players');
+  Meteor.subscribe('rules');
   if (Session.get('user_id')) Meteor.subscribe('games', Session.get('user_id'));
   Template.main.helpers({
     showWelcome: function () {
       return !Session.get('user_id');
     },
+    showLobbies: function () {
+      return !Session.get('rule_id'); // -1 is the holder for 'any'
+    },
     showLobby: function () {
-      return Session.get('user_id') && !currentGame();
+      return Session.get('user_id') && Session.get('rule_id') && !currentGame();
     },
     showGame: currentGame
   });
@@ -90,9 +133,19 @@ if (Meteor.isClient) {
   });
   Template.lobby.events({
     'click button': function (e, tmpl) {
-      Meteor.call('startGame', Session.get('user_id'), this._id, function (error, result) {
+      Meteor.call('startGame', Session.get('user_id'), this._id, Session.get('rule_id'), function (error, result) {
         handleMessage(error);
       });
+    }
+  });
+  Template.lobbies.helpers({
+    lobbies: function () {
+      return rules.find();
+    }
+  });
+  Template.lobbies.events({
+    'click .well': function () {
+      Session.set('rule_id', this._id)
     }
   });
   Template.game.rendered = function () {
@@ -142,18 +195,24 @@ if (Meteor.isServer) {
       if (notMyTurn(game, current_user)) {
         throw new Meteor.Error(500, "Not your turn.", {})
       }
-      if (move > 10 || move < 1) {
-        throw new Meteor.Error(500, "Invalid move. Please pick a number from 1 to 10", {})
+      var rule = rules.findOne({
+        _id: game.rule_id
+      }) || rules.findOne({
+        name: "Ian's Puzzle"
+      });
+      if (rule.allowedMoves.indexOf(move) < 0) {
+        throw new Meteor.Error(500, "Invalid move. Please pick a valid number: " + allowedMovesToString(rule.allowedMoves), {})
       }
       var newMove = {
         user_id: current_user,
         move: move
       };
       var total = game.total;
-      total += move;
-      if (total > 50) {
-        throw new Meteor.Error(500, 'Invalid move. Please pick a move which results in 50 or less.', {});
+      if (total == rule.goal) {
+        throw new Meteor.Error(500, 'Game is already over!');
       }
+      total += move;
+
       game.moves = game.moves || []
       game.moves.push(newMove);
       games.update({
@@ -166,8 +225,9 @@ if (Meteor.isServer) {
       });
       return game;
     },
-    startGame: function (current_user, user_id) {
+    startGame: function (current_user, user_id, rule_id) {
       return games.insert({
+        rule_id: rule_id,
         players: [
           current_user,
           user_id
@@ -203,6 +263,9 @@ if (Meteor.isServer) {
   });
   Meteor.publish('players', function () {
     return players.find();
+  });
+  Meteor.publish('rules', function () {
+    return  rules.find();
   });
   Meteor.publish('games', function (current_user) {
     return games.find({
@@ -276,6 +339,50 @@ if (Meteor.isServer) {
       });
       players.insert({
         userName: 'Freddy'
+      });
+    }
+    if (!rules.find().count()) {
+      rules.insert({
+        name: "Ian's Puzzle",
+        description: "The brain teaser Ian uses to quiz developers",
+        allowedMoves: [1,2,3,4,5,6,7,8,9,10],
+        goal: 50,
+        playerCount: 2
+      });
+      rules.insert({
+        name: "Pennies",
+        description: "A classic version of this game often played with pennies or small stones.",
+        allowedMoves: [1,2],
+        goal: 21,
+        playerCount: 2
+      });
+      rules.insert({
+        name: "Backstab",
+        description: "Three players gives this game an interesting twist.",
+        allowedMoves: [1,2,3,4,5],
+        goal: 43,
+        playerCount: 3
+      });
+      rules.insert({
+        name: "Party Time",
+        description: "Try this as your next birthday party crowd pleaser?",
+        allowedMoves: [1,2,3,4,5],
+        goal: 30,
+        playerCount: 6
+      });
+      rules.insert({
+        name: "Long stick",
+        description: "Just a little different from Ian's puzzle, you can't pick small numbers.",
+        allowedMoves: [8,9,10],
+        goal: 50,
+        playerCount: 2
+      });
+      rules.insert({
+        name: "Marshy",
+        description: "Your choices are very limited, and it's a short race too.",
+        allowedMoves: [3,8,10],
+        goal: 24,
+        playerCount: 2
       });
     }
   });

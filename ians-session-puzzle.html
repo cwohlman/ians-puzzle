@@ -17,6 +17,9 @@
   {{#if showWelcome}}
     {{> welcome}}
   {{/if}}
+  {{#if showLobbies}}
+    {{> lobbies}}
+  {{/if}}
   {{#if showLobby}}
     {{> lobby}}
   {{/if}}
@@ -27,6 +30,18 @@
 <template name="welcome">
   <div class="row">
   <form class="span4 offset4"><input type="text" class="input-block-level" placeholder="What's your name?"></form>
+  </div>
+</template>
+<template name="lobbies">
+  <div class="row">
+    {{#each lobbies}}
+      <div class="span4">
+        <div class="well">
+          <h3>{{name}}</h3>
+          <p>{{description}}</p>
+        </div>
+      </div>
+    {{/each}}
   </div>
 </template>
 <template name="lobby">
