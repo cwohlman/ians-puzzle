@@ -307,19 +307,25 @@ if (Meteor.isServer) {
     var psmithsGames = games.find({
       players: {
         $in: [psmith]
-      },
-      total: {
-        $lt: 50
       }
     }).fetch();
     psmithsGames.forEach(function (game) {
+      var rule = rules.findOne({
+        _id: game.rule_id
+      });
       if (notMyTurn(game, psmith)) {
         // Don't move, it's not our turn yet.
+      } else if  (!rule || game.total >= rule.goal) {
+        // Don't move, game is over.
       } else if (game.moves) {
         // We don't move on the first move, we want to give the player the chance to go first.
         var total = game.total;
-        var computerpick = (50 - total) % 11;
-        if (computerpick == 0) computerpick = Math.round(Math.random() * 9 + 1);
+        var first = Number(rule.allowedMoves[0]);
+        var last = Number(rule.allowedMoves[rule.allowedMoves.length - 1]);
+        var computerpick = (rule.goal - total) % (first + last);
+        if (rule.allowedMoves.indexOf(computerpick) == -1) {
+          computerpick = rule.allowedMoves[Math.round(Math.random() * (rule.allowedMoves.length - 1))]
+        }
         Meteor.call('submitMove', psmith, game._id, computerpick, function (error, result) {
           console.log(error)
         });
@@ -399,14 +405,14 @@ if (Meteor.isServer) {
         name: "Long stick",
         description: "Just a little different from Ian's puzzle, you can't pick small numbers.",
         allowedMoves: [8,9,10],
-        goal: 50,
+        goal: 52,
         playerCount: 2
       });
       rules.insert({
         name: "Marshy",
         description: "Your choices are very limited, and it's a short race too.",
         allowedMoves: [3,8,10],
-        goal: 24,
+        goal: 55,
         playerCount: 2
       });
     }
