@@ -19,7 +19,7 @@ var currentRule = function (collection) {
   }) || collection.findOne({name: "Ian's Puzzle"});;
 }
 
-var notMyTurn = function (game, player_id) {
+ notMyTurn = function (game, player_id) {
   var lastMove = game.moves && game.moves[game.moves.length - 1];
   return lastMove && lastMove.user_id == player_id;
 }
@@ -340,20 +340,37 @@ if (Meteor.isServer) {
     var psmithsGames = games.find({
       players: {
         $in: [psmith]
-      },
-      total: {
-        $lt: 50
       }
     }).fetch();
     psmithsGames.forEach(function (game) {
+      var rule = rules.findOne({
+        _id: game.rule_id
+      });
       if (notMyTurn(game, psmith)) {
         // Don't move, it's not our turn yet.
-      } else {
-        // Freddy tries to go first, but won't always win
+      } else if  (!rule || game.total >= rule.goal) {
+        // Don't move, game is over.
+      } else if (game.moves) {
+        // We don't move on the first move, we want to give the player the chance to go first.
         var total = game.total;
-        var computerpick = (50 - total) % 11;
-        if (computerpick == 0) computerpick = Math.round(Math.random() * 9 + 1);
-        if (total < 40) computerpick += Math.round(Math.random() * 2 - 1)
+        // Freddie tries to look ahead and pick the path of most likely win
+        var moveMap = rule.allowedMoves.map(function (moveA) {
+          // Freddies next move
+          return {
+            move: moveA,
+            successRate: rule.allowedMoves.map(function (moveB) {
+              return rule.allowedMoves.map(function (moveC) {
+                return ((total + moveA + moveB + moveC) >= rule.goal && (total + moveA + moveB) < rule.goal) || total + moveA >= rule.goal
+              }).indexOf(true) != -1;
+            }).filter(function (a) {return a;}).length
+          };
+        }).sort(function (a, b) {
+          return b.successRate - a.successRate;
+        });
+        computerpick = moveMap[0].move;
+        if (moveMap[0].successRate < rules.length / 2) {
+          computerpick = rule.allowedMoves[Math.round(Math.random() * (rule.allowedMoves.length - 1))]
+        }
         Meteor.call('submitMove', psmith, game._id, computerpick, function (error, result) {
           console.log(error)
         });
