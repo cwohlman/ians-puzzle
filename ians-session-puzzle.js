@@ -95,7 +95,7 @@ if (Meteor.isClient) {
       return !Session.get('user_id');
     },
     showLobbies: function () {
-      return !Session.get('rule_id'); // -1 is the holder for 'any'
+      return !Session.get('rule_id') && !currentGame(); // -1 is the holder for 'any'
     },
     showLobby: function () {
       return Session.get('user_id') && Session.get('rule_id') && !currentGame();
@@ -122,6 +122,27 @@ if (Meteor.isClient) {
         Session.set('user_id', result);
         Meteor.subscribe('games', result);
       });
+    }
+  });
+  Template.heroContent.helpers({
+    gameName: function () {
+      var rule = currentRule();
+      if (rule) return rule.name;
+      else return "Ian's Game";
+    },
+    gameDescription: function () {
+      var rule = currentRule();
+      if (currentGame()) {
+        return rule.description;
+      } else {
+        return "Where you can play some fun puzzles against men or machines."
+      }
+    },
+    gameRules: function () {
+      var rule = currentRule();
+      if (currentGame()) {
+        return "Pick a number (" + allowedMovesToString(rule.allowedMoves) + "), try to pick the final number adding up to " + rule.goal; 
+      }
     }
   });
   Template.lobby.helpers({

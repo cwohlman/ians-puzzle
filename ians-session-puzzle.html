@@ -5,8 +5,7 @@
 <body>
 	<div class="container">
   	<div class="hero-unit">
-  		<h1>Welcome to Ian's Puzzle</h1>
-  		<p>Enter the final number to add up to 50!</p>
+  		{{> heroContent}}
   	</div>
     {{> main}}
       
@@ -76,6 +75,11 @@
   <div class="alert {{alertClass}} notify" style="display: none;">
     <b>{{messageText}}</b>
   </div>
+</template>
+<template name="heroContent">
+  <h1>Welcome to {{gameName}}</h1>
+  <p>{{gameDescription}}</p>
+  <p>{{gameRules}}</p>
 </template>
 <template name="lost">
 You're lost!
